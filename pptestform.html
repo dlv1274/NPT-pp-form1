@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Secure Payment Tokenization</title>
+  <script src="https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .section { margin-bottom: 20px; }
+    .hidden { display: none; }
+    label { display: block; margin: 5px 0 2px; }
+    input, select { width: 100%; padding: 6px; }
+    button { padding: 10px 15px; }
+  </style>
+</head>
+<body>
+  <h2>Enter Payment Information</h2>
+
+  <div class="section">
+    <label for="paymentType">Payment Type:</label>
+    <select id="paymentType" onchange="togglePaymentFields()">
+      <option value="card">Credit Card</option>
+      <option value="ach">Bank (ACH/EFT)</option>
+    </select>
+  </div>
+
+  <!-- Credit Card Fields -->
+  <div id="cardFields" class="section">
+    <label>Card Number</label>
+    <input id="ccNumber" type="text" maxlength="16" placeholder="4111111111111111">
+
+    <label>Expiration Month (MM)</label>
+    <input id="ccExpMonth" type="text" maxlength="2" placeholder="07">
+
+    <label>Expiration Year (YY)</label>
+    <input id="ccExpYear" type="text" maxlength="2" placeholder="29">
+
+    <label>CVV</label>
+    <input id="ccCVV" type="text" maxlength="4" placeholder="123">
+  </div>
+
+  <!-- ACH Fields -->
+  <div id="achFields" class="section hidden">
+    <label>Routing Number</label>
+    <input id="achRouting" type="text" placeholder="056008849">
+
+    <label>Account Number</label>
+    <input id="achAccount" type="text" placeholder="12345678901234">
+  </div>
+
+  <button onclick="tokenize()">Tokenize Payment</button>
+
+  <div id="result" class="section"></div>
+
+  <script>
+    // Merchant credentials (test)
+    const merchantId = "763941734681";
+    const merchantKey = "H5V9Q1C6R8L4";
+
+    function togglePaymentFields() {
+      const type = document.getElementById("paymentType").value;
+      document.getElementById("cardFields").classList.toggle("hidden", type !== "card");
+      document.getElementById("achFields").classList.toggle("hidden", type !== "ach");
+    }
+
+    function tokenize() {
+      const type = document.getElementById("paymentType").value;
+      const sc = SafeCharge({
+        env: 'int', // use 'int' for integration (sandbox) environment
+        merchantId: merchantId,
+        merchantSiteId: merchantKey
+      });
+
+      const sessionToken = Math.random().toString(36).substring(2); // Simulate a token (for testing purposes)
+
+      if (type === "card") {
+        sc.createToken({
+          sessionToken: sessionToken,
+          cardData: {
+            cardNumber: document.getElementById("ccNumber").value,
+            cardHolderName: "Test User",
+            expirationMonth: document.getElementById("ccExpMonth").value,
+            expirationYear: document.getElementById("ccExpYear").value,
+            CVV: document.getElementById("ccCVV").value
+          }
+        }, function (res) {
+          if (res && res.transactionStatus === "APPROVED") {
+            handleTokenSuccess({
+              PayType: "Charge Card",
+              CCType: res.ccCardType,
+              Last4: res.ccCardNumber.slice(-4),
+              EXMO: document.getElementById("ccExpMonth").value,
+              EXYR: document.getElementById("ccExpYear").value,
+              PayGUID: res.transactionId
+            });
+          } else {
+            document.getElementById("result").innerText = "Card Tokenization Failed";
+          }
+        });
+
+      } else {
+        sc.createToken({
+          sessionToken: sessionToken,
+          paymentOption: {
+            card: null,
+            subMethod: "ACH",
+            holderName: "Test User",
+            bankAccount: {
+              routingNumber: document.getElementById("achRouting").value,
+              accountNumber: document.getElementById("achAccount").value
+            }
+          }
+        }, function (res) {
+          if (res && res.transactionStatus === "APPROVED") {
+            handleTokenSuccess({
+              PayType: "EFT",
+              Last4: document.getElementById("achAccount").value.slice(-4),
+              PayGUID: res.transactionId
+            });
+          } else {
+            document.getElementById("result").innerText = "Bank Tokenization Failed";
+          }
+        });
+      }
+    }
+
+    function handleTokenSuccess(data) {
+      document.getElementById("result").innerText = "Tokenization successful.";
+      console.log("Captured token data:", data);
+
+      // Optional: send back to DialedIn via postMessage
+      if (window.opener) {
+        window.opener.postMessage(data, "*");
+        window.close();
+      }
+    }
+  </script>
+</body>
+</html>
