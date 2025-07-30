@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Secure Payment Tokenization</title>
+  <script src="https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Enter Payment Info</h2>
+
+  <div class="section">
+    <label><input type="radio" name="payType" value="card" checked> Credit Card</label>
+    <label><input type="radio" name="payType" value="eft"> Bank Account (ACH)</label>
+  </div>
+
+  <!-- Credit Card Form -->
+  <form id="cardForm" class="section">
+    <input type="text" id="ccNumber" placeholder="Card Number" required><br><br>
+    <input type="text" id="ccExpMonth" placeholder="Expiration Month (MM)" required><br><br>
+    <input type="text" id="ccExpYear" placeholder="Expiration Year (YY)" required><br><br>
+    <input type="text" id="ccCVV" placeholder="CVV" required><br><br>
+    <button type="button" onclick="tokenizeCard()">Submit Card</button>
+  </form>
+
+  <!-- ACH / EFT Form -->
+  <form id="eftForm" class="section hidden">
+    <input type="text" id="eftRouting" placeholder="Routing Number" required><br><br>
+    <input type="text" id="eftAccount" placeholder="Account Number" required><br><br>
+    <button type="button" onclick="tokenizeEFT()">Submit ACH</button>
+  </form>
+
+  <script>
+    const merchantId = "763941734681";
+    const merchantSiteId = "H5V9Q1C6R8L4";
+
+    // Toggle form view
+    document.querySelectorAll('input[name="payType"]').forEach((el) =>
+      el.addEventListener('change', () => {
+        const type = document.querySelector('input[name="payType"]:checked').value;
+        document.getElementById('cardForm').classList.toggle('hidden', type !== 'card');
+        document.getElementById('eftForm').classList.toggle('hidden', type !== 'eft');
+      })
+    );
+
+    function postToParent(payload) {
+      window.opener.postMessage(payload, '*');
+      window.close();
+    }
+
+    function getCardType(number) {
+      if (/^4/.test(number)) return 'Visa';
+      if (/^5[1-5]/.test(number)) return 'MasterCard';
+      if (/^3[47]/.test(number)) return 'AmEx';
+      if (/^6/.test(number)) return 'Discover';
+      return 'Unknown';
+    }
+
+    function tokenizeCard() {
+      const number = document.getElementById('ccNumber').value;
+      const expMonth = document.getElementById('ccExpMonth').value;
+      const expYear = document.getElementById('ccExpYear').value;
+      const cvv = document.getElementById('ccCVV').value;
+
+      SafeCharge.setMerchantDetails({ merchantId, merchantSiteId });
+
+      SafeCharge.createToken({
+        cardData: {
+          cardNumber: number,
+          cardHolderName: "Test Donor",
+          expirationMonth: expMonth,
+          expirationYear: expYear,
+          CVV: cvv
+        }
+      },
+      function (response) {
+        if (response && response.transactionStatus === "APPROVED") {
+          const ccType = getCardType(number);
+          postToParent({
+            PayType: "Charge Card",
+            CCType: ccType,
+            Last4: number.slice(-4),
+            EXMO: expMonth,
+            EXYR: expYear,
+            PayGUID: response.ccTempToken
+          });
+        } else {
+          alert("Tokenization failed: " + (response.reason || "Unknown error"));
+        }
+      });
+    }
+
+    function tokenizeEFT() {
+      const routing = document.getElementById('eftRouting').value;
+      const account = document.getElementById('eftAccount').value;
+
+      SafeCharge.setMerchantDetails({ merchantId, merchantSiteId });
+
+      SafeCharge.createToken({
+        paymentOption: {
+          card: null,
+          billingAddress: {},
+          ach: {
+            accountType: "CHECKING",
+            routingNumber: routing,
+            accountNumber: account
+          }
+        }
+      },
+      function (response) {
+        if (response && response.transactionStatus === "APPROVED") {
+          postToParent({
+            PayType: "EFT",
+            PayGUID: response.ccTempToken,
+            CCType: "",
+            Last4: account.slice(-4),
+            EXMO: "",
+            EXYR: ""
+          });
+        } else {
+          alert("EFT Tokenization failed: " + (response.reason || "Unknown error"));
+        }
+      });
+    }
+  </script>
+</body>
+</html>
