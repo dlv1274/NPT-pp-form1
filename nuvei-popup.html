@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mock Nuvei Tokenizer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    h2 {
+      color: #333;
+    }
+    button {
+      margin: 10px 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .log {
+      margin-top: 20px;
+      background: #fff;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Mock Nuvei Payment Tokenizer</h2>
+  <p>This mock window simulates the response Nuvei would return after tokenizing payment data.</p>
+
+  <button onclick="sendMockCard()">Send Mock Credit Card</button>
+  <button onclick="sendMockACH()">Send Mock ACH (Bank)</button>
+
+  <div class="log" id="log">Waiting...</div>
+
+  <script>
+    function sendMockCard() {
+      const message = {
+        source: "NUVEI_POPUP",
+        PayGUID: "MOCK-CARD-32N8VT1V6",
+        PayType: "Charge Card",
+        CCType: "Visa",
+        Last4: "4242",
+        EXMO: "08",
+        EXYR: "2027"
+      };
+      logMessage(message);
+      window.opener.postMessage(message, "*");
+      window.close();
+    }
+
+    function sendMockACH() {
+      const message = {
+        source: "NUVEI_POPUP",
+        PayGUID: "MOCK-EFT-X7A2WZ3PQ",
+        PayType: "EFT",
+        CCType: "",
+        Last4: "0000",
+        EXMO: "",
+        EXYR: ""
+      };
+      logMessage(message);
+      window.opener.postMessage(message, "*");
+      window.close();
+    }
+
+    function logMessage(msg) {
+      document.getElementById("log").textContent = "Sending message:\n" + JSON.stringify(msg, null, 2);
+    }
+  </script>
+
+</body>
+</html>
